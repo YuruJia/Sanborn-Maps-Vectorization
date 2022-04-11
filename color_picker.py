@@ -1,6 +1,4 @@
-from osgeo import gdal
-from osgeo import osr
-from osgeo import ogr
+from osgeo import gdal, ogr, osr
 from skimage import io
 import cv2
 import statistics as stats
@@ -15,6 +13,8 @@ import csv
 input_path = 'C:/Users/Matthias Walder/Desktop/Geologie/Multimedia Cartography/Project/material_sanborn/sheets/6751.tif'
 mapfile = gdal.Open(input_path)
 raster_data = mapfile.ReadAsArray()
+projection = mapfile.GetProjection()
+transform = mapfile.GetGeoTransform()
 
 # Disentangle the individual channels
 band1 = mapfile.GetRasterBand(1) # Red channel
@@ -119,3 +119,82 @@ for tolerance in range(4,20,2):
     plt.imshow(output)
 
 plt.show() 
+
+# Create a Mask (1D-Array) with binary value range
+red_band = output[:,:,0]; green_band = output[:,:,1]; blue_band = output[:,:,2]
+
+
+for cell in np.nditer(red_band, op_flags=['readwrite']):
+    if cell[...] < 15:
+        cell[...] = 0
+    else:
+        cell[...] = 1
+
+for cell in np.nditer(green_band, op_flags=['readwrite']):
+    if cell[...] < 15:
+        cell[...] = 0
+    else:
+        cell[...] = 1
+        
+for cell in np.nditer(blue_band, op_flags=['readwrite']):
+    if cell[...] < 15:
+        cell[...] = 0
+    else:
+        cell[...] = 1
+
+mask = green_band*blue_band*red_band
+mask = mask*255
+
+# Modify the mask
+
+
+area_threshold = 7
+
+num_labels, labels, stats, _  = cv2.connectedComponentsWithStats(mask, 4, cv2.CV_32S) #num_labels = total number of unique labels / labels has the same spatial dimension as raster_data / for each location in labels
+
+
+for label_idx in range(num_labels): 
+    label_mask = (labels == label_idx)
+    
+    if stats[label_idx, 4] <= area_threshold:
+         mask[label_mask[:]] = 0
+
+plt.imshow(mask, cmap = "gray")
+plt.show()
+
+kernel = np.ones((3,3,), np.uint8)
+mask = cv2.dilate(mask, kernel, iterations= 5)
+mask = cv2.erode(mask, kernel, iterations = 5)
+
+plt.imshow(mask, cmap = "gray")
+plt.show()
+
+#write to raster_file
+
+def write_raster_simple(path, projection, transform, height, width, array):
+    driver = gdal.GetDriverByName("GTiff")
+    outdata = driver.Create(path, width, height, 1, gdal.GDT_Int16, ['COMPRESS=LZW'])
+
+    outdata.SetGeoTransform(transform)
+    outdata.SetProjection(projection)
+
+    outdata.GetRasterBand(1).WriteArray(array)
+
+    outdata.FlushCache()
+    outdata = None
+
+write_raster_simple("data/export.tif", projection, transform, mask.shape[0], mask.shape[1], mask)
+
+#write to shapefile
+
+srs = osr.SpatialReference()
+srs.ImportFromWkt(projection)
+
+polygons_path = "data/polygons.shp"
+drv = ogr.GetDriverByName("ESRI Shapefile")
+dst_ds = drv.CreateDataSource( polygons_path )
+dst_layer = dst_ds.CreateLayer("polygons", srs = srs )
+gdal.Polygonize(mask, mask, dst_layer, -1, [], callback=None)
+
+dst_layer = None
+dst_ds = None
