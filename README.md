@@ -14,4 +14,4 @@ This is a course project of Reseach Topics in Cartography at ETHz.
 
 **Results**
 ![image](https://user-images.githubusercontent.com/91590963/174077636-c0b7d250-54eb-47a0-b9a7-094808fa2a75.png)
-![image](https://user-images.githubusercontent.com/91590963/174077781-b82691e4-5e3d-4985-84ad-53cb0f89fac8.png)
+![image](https://user-images.githubusercontent.com/91590963/174089663-baeaf5db-567f-4edd-88b3-7818cd2089e5.png)
